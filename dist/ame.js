@@ -28,9 +28,12 @@ var AMEQueuedJob = (function (_super) {
         var _this = this;
         _super.call(this);
         this._status = AMEQueuedJobStatus.Pending;
+        this._statusDetail = "";
         this._errorStateTimeoutSeconds = 15;
         this._submitRetries = 10;
+        this._submitRetryDelaySeconds = 1;
         this._abortRetries = 3;
+        this._abortRetryDelaySeconds = 1;
         this._aborted = false;
         this._waitErrorStateSince = null;
         this._isSubmitted = false;
@@ -49,6 +52,7 @@ var AMEQueuedJob = (function (_super) {
             .state('submit')
             .onEnter(function () { return _this._submit(); })
             .on('submit').selfTransition()
+            .on('failed').transitionTo('end')
             .on('abort').transitionTo('abort')
             .on('rejected').transitionTo('end')
             .on('accepted').transitionTo('wait')
@@ -95,6 +99,13 @@ var AMEQueuedJob = (function (_super) {
         enumerable: true,
         configurable: true
     });
+    Object.defineProperty(AMEQueuedJob.prototype, "statusDetail", {
+        get: function () {
+            return this._statusDetail;
+        },
+        enumerable: true,
+        configurable: true
+    });
     Object.defineProperty(AMEQueuedJob.prototype, "lastStatusResponse", {
         get: function () {
             return this._mostRecentStatus;
@@ -122,10 +133,11 @@ var AMEQueuedJob = (function (_super) {
             this._states.handle('abort');
         this._isAborted = true;
     };
-    AMEQueuedJob.prototype._emitProgress = function () {
+    AMEQueuedJob.prototype._emitProgress = function (forceEmit) {
+        if (forceEmit === void 0) { forceEmit = false; }
         var cur = this._mostRecentStatus || this._submitStatus;
         var last = this._lastEmitStatsResponse;
-        if (last == null || cur == null || (last.jobStatus != cur.jobStatus) || (last.jobProgress != cur.jobProgress) || (this._status != this._lastEmitStatus))
+        if (forceEmit || last == null || cur == null || (last.jobStatus != cur.jobStatus) || (last.jobProgress != cur.jobProgress) || (this._status != this._lastEmitStatus))
             this._safeEmit('progress', this);
         this._lastEmitStatsResponse = cur;
         this._lastEmitStatus = this._status;
@@ -150,11 +162,15 @@ var AMEQueuedJob = (function (_super) {
         var _this = this;
         this._status = AMEQueuedJobStatus.Pending;
         if (wasBusy || this._submitRetries-- > 0) {
-            this._log.info("Retrying submit to AME in 1s..");
-            setTimeout(function () { return _this._states.handle('submit'); }, 1000);
+            this._statusDetail = "Retrying submit to AME in " + this._submitRetryDelaySeconds + "s (attempts left: " + this._submitRetries + ")";
+            this._log.info("Retrying submit to AME in " + this._submitRetryDelaySeconds + "s (attempts left: " + this._submitRetries + ")");
+            this._emitProgress(true);
+            setTimeout(function () { return _this._states.handle('submit'); }, 1000 * this._submitRetryDelaySeconds);
         }
         else {
             this._log.info("Exceeded submit retry limit, failing job..");
+            this._statusDetail = "Exceeded submit retry limit, failing job..";
+            this._emitProgress(true);
             this._states.handle('failed');
         }
     };
@@ -163,6 +179,8 @@ var AMEQueuedJob = (function (_super) {
         var _a = [this._log, this._ame], log = _a[0], ame = _a[1];
         log.info('Submitting job to AME..');
         this._status = AMEQueuedJobStatus.Submitting;
+        this._statusDetail = "(Attempts left: " + this._submitRetries + ")";
+        this._emitProgress();
         ame.client.submitJob(this._job).then(function (status) {
             _this._submitStatus = status;
             log.info("AME responded with submit status '" + status.submitResultText + "'");
@@ -220,6 +238,7 @@ var AMEQueuedJob = (function (_super) {
         var _this = this;
         var _a = [this._log, this._ame], log = _a[0], ame = _a[1];
         this._status = AMEQueuedJobStatus.Encoding;
+        this._statusDetail = "";
         log.info("Querying AME job status..");
         ame.client.getJobStatus().then(function (status) {
             log.info("Queried AME job status (" + status.jobStatusText + ")");
@@ -240,17 +259,20 @@ var AMEQueuedJob = (function (_super) {
                     _this._states.handle('end-check-history');
                     break;
                 case ame_webservice_client_1.AMEJobStatus.Stopped:
-                    log.error("AME reports our job as stopped (aborted in the GUI)");
+                    log.error("AME reports our job as stopped (aborted)");
                     _this._status = AMEQueuedJobStatus.Aborted;
+                    _this._statusDetail = "AME reports our job as stopped (aborted)";
                     _this._states.handle('end');
                     break;
                 case ame_webservice_client_1.AMEJobStatus.Failed:
+                    _this.statusDetail = "AME reports our job as failed";
                     log.error("AME reports our job as failed");
                     _this._states.handle('end');
                     break;
                 case ame_webservice_client_1.AMEJobStatus.Success:
                     log.info("AME reports our job as successfully completed!");
                     _this._status = AMEQueuedJobStatus.Succeeded;
+                    _this._statusDetail = "AME reports our job as successfully completed!";
                     _this._states.handle('end');
                     break;
                 case ame_webservice_client_1.AMEJobStatus.Unknown:
@@ -271,11 +293,21 @@ var AMEQueuedJob = (function (_super) {
         if (status === void 0) { status = ame_webservice_client_1.AMEJobStatus.Failed; }
         if (this._mostRecentStatus == null)
             this._mostRecentStatus = clone(this._submitStatus);
+        if (this._mostRecentStatus == null)
+            this._mostRecentStatus = {
+                serverStatus: ame_webservice_client_1.AMEServerStatus.Unknown,
+                serverStatusText: ame_webservice_client_1.AMEServerStatus[ame_webservice_client_1.AMEServerStatus.Unknown],
+                jobId: '',
+                jobStatus: ame_webservice_client_1.AMEJobStatus.Unknown,
+                jobStatusText: AMEQueuedJobStatus[ame_webservice_client_1.AMEJobStatus.Unknown],
+                jobProgress: undefined,
+                details: '(Job was never submitted to the server)'
+            };
         if (this._mostRecentStatus.jobStatus != ame_webservice_client_1.AMEJobStatus.Success
             && this._mostRecentStatus.jobStatus != ame_webservice_client_1.AMEJobStatus.Failed
             && this._mostRecentStatus.jobStatus != ame_webservice_client_1.AMEJobStatus.Stopped) {
             this._mostRecentStatus.serverStatus = ame_webservice_client_1.AMEServerStatus.Unknown;
-            this._mostRecentStatus.serverStatusText = 'Unknown';
+            this._mostRecentStatus.serverStatusText = ame_webservice_client_1.AMEServerStatus[ame_webservice_client_1.AMEServerStatus.Unknown];
             this._mostRecentStatus.jobStatus = status;
             this._mostRecentStatus.jobStatusText = ame_webservice_client_1.AMEJobStatus[status];
             if (details != undefined)
@@ -286,6 +318,8 @@ var AMEQueuedJob = (function (_super) {
         var _this = this;
         var _a = [this._log, this._ame], log = _a[0], ame = _a[1];
         this._status = AMEQueuedJobStatus.Aborting;
+        this._statusDetail = "Attempting to abort submitted job in AME.. (attempts left: " + this._abortRetries + ")";
+        this._emitProgress(true);
         log.info("Getting AME job status before aborting job..");
         ame.client.getJobStatus().then(function (status) {
             if (status.jobId == _this._submitStatus.jobId) {
@@ -294,11 +328,13 @@ var AMEQueuedJob = (function (_super) {
                     log.info("AME reports job successfully aborted!");
                     _this._copySubmitStatus("Aborted upon request");
                     _this._status = AMEQueuedJobStatus.Aborted;
+                    _this._statusDetail = "AME reports job successfully aborted!";
                     _this._emitProgress();
                 }, function (error) {
-                    log.error("Error while aborting AME job: " + error.message);
+                    _this._statusDetail = "Error while aborting AME job: " + error.message;
+                    log.error(_this._statusDetail);
+                    _this._emitProgress(true);
                     _this._retryAbortSubmitted();
-                    _this._emitProgress();
                 });
             }
             else {
@@ -314,10 +350,18 @@ var AMEQueuedJob = (function (_super) {
     };
     AMEQueuedJob.prototype._retryAbortSubmitted = function () {
         var _this = this;
-        if (this._abortRetries-- > 0)
-            setTimeout(function () { return _this._states.handle('abort'); }, 1000);
-        else
+        if (this._abortRetries-- > 0) {
+            this._statusDetail = "Retrying abort in " + this._abortRetryDelaySeconds + "s (attempts left: " + this._abortRetries + ")";
+            this._log.info(this._statusDetail);
+            this._emitProgress(true);
+            setTimeout(function () { return _this._states.handle('abort'); }, 1000 * this._abortRetryDelaySeconds);
+        }
+        else {
+            this._statusDetail = "Number of retry attempts saturated - ending job..";
+            this._log.info(this._statusDetail);
+            this._emitProgress(true);
             this._states.handle('end-check-history');
+        }
     };
     AMEQueuedJob.prototype._checkHistoryForStatus = function () {
         var _this = this;

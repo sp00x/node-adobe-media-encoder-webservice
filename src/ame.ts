@@ -65,10 +65,16 @@ export class AMEQueuedJob extends events.EventEmitter
     private _id: string;
 
     private _status: AMEQueuedJobStatus = AMEQueuedJobStatus.Pending;
+    private _statusDetail: string = "";
 
     private _errorStateTimeoutSeconds: number = 15;
+    
     private _submitRetries: number = 10;
+    private _submitRetryDelaySeconds: number = 1;
+    
     private _abortRetries: number = 3;
+    private _abortRetryDelaySeconds: number = 1;
+    
     private _aborted: boolean = false;
 
     private _submitStatus: IAMESubmitJobResponse;
@@ -93,6 +99,11 @@ export class AMEQueuedJob extends events.EventEmitter
     get statusText(): string
     {
         return AMEQueuedJobStatus[this._status];
+    }
+
+    get statusDetail(): string
+    {
+        return this._statusDetail;
     }
 
     get lastStatusResponse(): IAMEJobStatusResponse
@@ -132,6 +143,7 @@ export class AMEQueuedJob extends events.EventEmitter
 
                     .onEnter(() => this._submit())
                     .on('submit').selfTransition() // busy/retry
+                    .on('failed').transitionTo('end')
                     .on('abort').transitionTo('abort')
                     .on('rejected').transitionTo('end')
                     .on('accepted').transitionTo('wait')
@@ -189,12 +201,12 @@ export class AMEQueuedJob extends events.EventEmitter
 
     private _lastEmitStatus: AMEQueuedJobStatus = null;
 
-    private _emitProgress(): void
+    private _emitProgress(forceEmit: boolean = false): void
     {
         const cur = this._mostRecentStatus || this._submitStatus;
         const last = this._lastEmitStatsResponse;
 
-        if (last == null || cur == null || (last.jobStatus != cur.jobStatus) || (last.jobProgress != cur.jobProgress) || (this._status != this._lastEmitStatus))
+        if (forceEmit || last == null || cur == null || (last.jobStatus != cur.jobStatus) || (last.jobProgress != cur.jobProgress) || (this._status != this._lastEmitStatus))
             this._safeEmit('progress', this);
 
         this._lastEmitStatsResponse = cur;
@@ -224,12 +236,18 @@ export class AMEQueuedJob extends events.EventEmitter
 
         if (wasBusy || this._submitRetries-- > 0)
         {
-            this._log.info("Retrying submit to AME in 1s..");
-            setTimeout(() => this._states.handle('submit'), 1000);
+            this._statusDetail = `Retrying submit to AME in ${this._submitRetryDelaySeconds}s (attempts left: ${this._submitRetries})`;
+            this._log.info(`Retrying submit to AME in ${this._submitRetryDelaySeconds}s (attempts left: ${this._submitRetries})`);
+            this._emitProgress(true);
+            
+            setTimeout(() => this._states.handle('submit'), 1000 * this._submitRetryDelaySeconds);
         }
         else
         {
             this._log.info("Exceeded submit retry limit, failing job..")
+            this._statusDetail = "Exceeded submit retry limit, failing job..";
+            this._emitProgress(true);
+
             this._states.handle('failed');
         }
     }
@@ -240,6 +258,8 @@ export class AMEQueuedJob extends events.EventEmitter
 
         log.info('Submitting job to AME..');
         this._status = AMEQueuedJobStatus.Submitting;
+        this._statusDetail = `(Attempts left: ${this._submitRetries})`;
+        this._emitProgress();
 
         ame.client.submitJob(this._job).then(
             (status: IAMESubmitJobResponse) =>
@@ -320,6 +340,7 @@ export class AMEQueuedJob extends events.EventEmitter
         const [ log, ame ] = [ this._log, this._ame ];
 
         this._status = AMEQueuedJobStatus.Encoding;
+        this._statusDetail = "";
 
         log.info("Querying AME job status..");
         ame.client.getJobStatus().then(
@@ -353,13 +374,15 @@ export class AMEQueuedJob extends events.EventEmitter
 
                     case AMEJobStatus.Stopped:
 
-                        log.error(`AME reports our job as stopped (aborted in the GUI)`);
+                        log.error(`AME reports our job as stopped (aborted)`);
                         this._status = AMEQueuedJobStatus.Aborted;
+                        this._statusDetail = `AME reports our job as stopped (aborted)`;
                         this._states.handle('end');
                         break;
 
                     case AMEJobStatus.Failed:
 
+                        this.statusDetail = `AME reports our job as failed`;
                         log.error(`AME reports our job as failed`);
                         //this._status = AMEQueuedJobStatus.Failed; // let 'ended' figure this out
                         this._states.handle('end');
@@ -369,6 +392,7 @@ export class AMEQueuedJob extends events.EventEmitter
 
                         log.info(`AME reports our job as successfully completed!`);
                         this._status = AMEQueuedJobStatus.Succeeded;
+                        this._statusDetail = `AME reports our job as successfully completed!`;
                         this._states.handle('end');
                         break;
 
@@ -395,6 +419,18 @@ export class AMEQueuedJob extends events.EventEmitter
         // only copy if a recent status isn't set
         if (this._mostRecentStatus == null)
             this._mostRecentStatus = clone(this._submitStatus);
+        
+        // if the submit status was null, then fake one.. 
+        if (this._mostRecentStatus == null)
+            this._mostRecentStatus = <IAMEJobStatusResponse>{
+                serverStatus: AMEServerStatus.Unknown,
+                serverStatusText: AMEServerStatus[AMEServerStatus.Unknown],  
+                jobId: '',
+                jobStatus: AMEJobStatus.Unknown,
+                jobStatusText: AMEQueuedJobStatus[AMEJobStatus.Unknown],
+                jobProgress: undefined,                                
+                details: '(Job was never submitted to the server)'
+            }
 
         // only update the status/details if the job didn't already complete by itself
         if (this._mostRecentStatus.jobStatus != AMEJobStatus.Success
@@ -402,7 +438,7 @@ export class AMEQueuedJob extends events.EventEmitter
             && this._mostRecentStatus.jobStatus != AMEJobStatus.Stopped)
         {
             this._mostRecentStatus.serverStatus = AMEServerStatus.Unknown;
-            this._mostRecentStatus.serverStatusText = 'Unknown';
+            this._mostRecentStatus.serverStatusText = AMEServerStatus[AMEServerStatus.Unknown];
 
             this._mostRecentStatus.jobStatus = status;
             this._mostRecentStatus.jobStatusText = AMEJobStatus[status];
@@ -416,6 +452,8 @@ export class AMEQueuedJob extends events.EventEmitter
         const [ log, ame ] = [ this._log, this._ame ];
 
         this._status = AMEQueuedJobStatus.Aborting;
+        this._statusDetail = `Attempting to abort submitted job in AME.. (attempts left: ${this._abortRetries})`;
+        this._emitProgress(true);
 
         // check that it's our job still being processed..
         log.info("Getting AME job status before aborting job..");
@@ -432,13 +470,16 @@ export class AMEQueuedJob extends events.EventEmitter
                             this._copySubmitStatus("Aborted upon request");
 
                             this._status = AMEQueuedJobStatus.Aborted;
+                            this._statusDetail = "AME reports job successfully aborted!";
                             this._emitProgress();
                         },
                         (error: any) =>
                         {
-                            log.error(`Error while aborting AME job: ${error.message}`);
+                            this._statusDetail = `Error while aborting AME job: ${error.message}`;
+                            log.error(this._statusDetail);                            
+                            this._emitProgress(true);
+                            
                             this._retryAbortSubmitted();
-                            this._emitProgress();
                         }
                     )
                 }
@@ -461,9 +502,21 @@ export class AMEQueuedJob extends events.EventEmitter
     private _retryAbortSubmitted()
     {
         if (this._abortRetries-- > 0)
-            setTimeout(() => this._states.handle('abort'), 1000)
+        {
+            this._statusDetail = `Retrying abort in ${this._abortRetryDelaySeconds}s (attempts left: ${this._abortRetries})`;
+            this._log.info(this._statusDetail);
+            this._emitProgress(true);
+            
+            setTimeout(() => this._states.handle('abort'), 1000 * this._abortRetryDelaySeconds)
+        }
         else
+        {
+            this._statusDetail = `Number of retry attempts saturated - ending job..`;            
+            this._log.info(this._statusDetail);            
+            this._emitProgress(true);
+            
             this._states.handle('end-check-history');
+        }
     }
 
     private _checkHistoryForStatus()
@@ -516,7 +569,7 @@ export class AMEQueuedJob extends events.EventEmitter
                 log.error(`Unable to get AME job history: ${error.message}`);
 
                 // make a fake error state for the 'ended' state to pick up
-                this._copySubmitStatus(`Unable to get AME job history: ${error.message}`);
+                this._copySubmitStatus(`Unable to get AME job history: ${error.message}`);                
                 this._states.handle("end");
             }
         )

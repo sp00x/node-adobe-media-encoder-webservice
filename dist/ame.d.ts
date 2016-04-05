@@ -24,9 +24,12 @@ export declare class AMEQueuedJob extends events.EventEmitter {
     private _states;
     private _id;
     private _status;
+    private _statusDetail;
     private _errorStateTimeoutSeconds;
     private _submitRetries;
+    private _submitRetryDelaySeconds;
     private _abortRetries;
+    private _abortRetryDelaySeconds;
     private _aborted;
     private _submitStatus;
     private _mostRecentStatus;
@@ -37,6 +40,7 @@ export declare class AMEQueuedJob extends events.EventEmitter {
     job: IAMEJobSubmission;
     status: AMEQueuedJobStatus;
     statusText: string;
+    statusDetail: string;
     lastStatusResponse: IAMEJobStatusResponse;
     progress: number;
     constructor(job: IAMEJobSubmission, logFactory: ILoggerFactory, ame: AdobeMediaEncoder, id?: string);
@@ -44,7 +48,7 @@ export declare class AMEQueuedJob extends events.EventEmitter {
     abort(): void;
     private _lastEmitStatsResponse;
     private _lastEmitStatus;
-    private _emitProgress();
+    private _emitProgress(forceEmit?);
     private _safeEmit(eventName, eventArgs?, dispatchViaImmediate?);
     private _retrySubmit(wasBusy);
     private _submit();
