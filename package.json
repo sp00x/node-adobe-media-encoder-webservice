@@ -1,0 +1,44 @@
+{
+  "name": "adobe-media-encoder-webservice",
+  "version": "0.1.0",
+  "description": "Adobe Media Encoder web service client",
+  "private": true,
+  "license": "UNLICENSED",
+  "keywords": [
+    "adobe media encoder",
+    "ame"
+  ],
+  "author": {
+    "name": "Rune Bjerke",
+    "email": "github.public@green.spoox.org",
+    "url": "http://spoox.org"
+  },
+  "scripts": {
+    "prepublish": "tsc -p .",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sp00x/node-adobe-media-encoder-webservice.git"
+  },
+  "homepage": "https://github.com/sp00x/node-adobe-media-encoder-webservice",
+  "bugs": {
+    "url" : "https://github.com/sp00x/node-adobe-media-encoder-webservice/issues"
+  },
+  "dependencies": {
+    "clone": "^1.0.2",
+    "fluent-state-machine": "^0.2.0",
+    "q": "^1.4.1",
+    "request": "^2.69.0",
+    "source-map-support": "^0.4.0",
+    "uuid4": "^1.0.0",
+    "xml-writer": "^1.6.0",
+    "xml2js": "^0.4.16",
+    "logging-interfaces": "git://github.com/sp00x/node-logging-interfaces.git#master"
+  },  
+  "devDependencies": {
+    "typescript": "^1.8.9"
+  },
+  "main": "dist/index",
+  "typings": "dist/index"  
+}

@@ -1,0 +1,12 @@
+{
+  "name": "adobe-media-encoder-webservice",
+  "version": false,
+  "ambientDependencies": {
+    "node": "github:DefinitelyTyped/DefinitelyTyped/node/node.d.ts#552fe5d3e45ef9c8ecd3eda2b6a24d2546c438f4",
+    "form-data": "github:DefinitelyTyped/DefinitelyTyped/form-data/form-data.d.ts#552fe5d3e45ef9c8ecd3eda2b6a24d2546c438f4",
+    "request": "github:DefinitelyTyped/DefinitelyTyped/request/request.d.ts#552fe5d3e45ef9c8ecd3eda2b6a24d2546c438f4",
+    "xml2js": "github:DefinitelyTyped/DefinitelyTyped/xml2js/xml2js.d.ts#552fe5d3e45ef9c8ecd3eda2b6a24d2546c438f4",
+    "Q": "github:DefinitelyTyped/DefinitelyTyped/q/Q.d.ts#552fe5d3e45ef9c8ecd3eda2b6a24d2546c438f4",
+    "clone": "github:DefinitelyTyped/DefinitelyTyped/clone/clone.d.ts#81ebfb3d08cd608a7c801668a6d5f7b2ea9ecc38"
+  }
+}
