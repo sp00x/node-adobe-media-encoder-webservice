@@ -23,22 +23,23 @@
   },
   "homepage": "https://github.com/sp00x/node-adobe-media-encoder-webservice",
   "bugs": {
-    "url" : "https://github.com/sp00x/node-adobe-media-encoder-webservice/issues"
+    "url": "https://github.com/sp00x/node-adobe-media-encoder-webservice/issues"
   },
   "dependencies": {
     "clone": "^1.0.2",
+    "finity": "^0.4.4",
     "fluent-state-machine": "^0.2.0",
+    "logging-interfaces": "git://github.com/sp00x/node-logging-interfaces.git#master",
     "q": "^1.4.1",
     "request": "^2.69.0",
     "source-map-support": "^0.4.0",
     "uuid4": "^1.0.0",
     "xml-writer": "^1.6.0",
-    "xml2js": "^0.4.16",
-    "logging-interfaces": "git://github.com/sp00x/node-logging-interfaces.git#master"
-  },  
+    "xml2js": "^0.4.16"
+  },
   "devDependencies": {
     "typescript": "^1.8.9"
   },
   "main": "dist/index",
-  "typings": "dist/index"  
+  "typings": "dist/index"
 }

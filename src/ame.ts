@@ -6,9 +6,9 @@ import q = require('q');
 import http = require('http');
 import clone = require('clone');
 
-//const StateMachine = require('fluent-state-machine');
-//import StateMachine from 'fluent-state-machine';
-const StateMachine = require('fluent-state-machine').default;
+//const StateMachine = require('finity');
+//import StateMachine from 'finity';
+const StateMachine = require('finity').default;
 
 const uuid4 = require('uuid4');
 
@@ -665,7 +665,7 @@ export class AdobeMediaEncoder extends events.EventEmitter
 
                 .initialState('idle')
 
-                    .onEnter(() => { if (this._queue.length > 0) this._queueStates.handle('enqueue') })
+                    .onEnter(() => { if (this._queue.length > 0) this._queueStates.handle('enqueue'); })
                     .on('enqueue').transitionTo('process')
 
                 .state('process')
