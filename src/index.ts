@@ -9,11 +9,13 @@ export {
 } from 'logging-interfaces';
 
 export {
-    AMEPresetsTreeReader,
+    AMEPresetsReader,
+    IAMEPresetsTree,
     IAMEPresetsTreeItem,
     AMEPresetsTreeItemType,
     IAMEPreset,
-} from './ame-presets-tree-reader';
+    IAMEPresetsCache
+} from './ame-presets-reader';
 
 export {
     IAMEWebserviceClient,

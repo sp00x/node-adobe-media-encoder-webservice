@@ -7,6 +7,56 @@ function xmlValue(x, defaultValue) {
     if (defaultValue === void 0) { defaultValue = undefined; }
     return (x != null && x instanceof Array) ? x[0] : defaultValue;
 }
+var AMEPresetsCacheReader = (function () {
+    function AMEPresetsCacheReader() {
+    }
+    AMEPresetsCacheReader.load = function (path) {
+        var d = q.defer();
+        fs.readFile(path, function (err, data) {
+            if (err)
+                return d.reject(err);
+            var xml = data.toString('utf-8');
+            var x = xml2js.parseString(xml, function (err, result) {
+                if (result.PremiereData == null)
+                    return d.reject(new Error("Expected <PremiereData> document element"));
+                var cache = {
+                    registry: {},
+                    list: []
+                };
+                AMEPresetsCacheReader._loadKeys(result.PremiereData, cache);
+                d.resolve(cache);
+            });
+        });
+        return d.promise;
+    };
+    AMEPresetsCacheReader._loadKeys = function (parentKeyNode, cache) {
+        if (parentKeyNode.Key) {
+            parentKeyNode.Key.forEach(function (node) {
+                AMEPresetsCacheReader._loadKeys(node, cache);
+            });
+        }
+        else if (parentKeyNode.DirectoryPath == null) {
+            var preset = {
+                id: xmlValue(parentKeyNode.PresetID),
+                path: xmlValue(parentKeyNode.PresetPath),
+                fileType: xmlValue(parentKeyNode.PresetFileType),
+                classId: xmlValue(parentKeyNode.PresetClassID),
+                name: xmlValue(parentKeyNode.PresetName),
+                modifiedTime: xmlValue(parentKeyNode.PresetModifiedTime),
+                folderDisplayPath: xmlValue(parentKeyNode.FolderDisplayPath)
+            };
+            console.log(preset.path);
+            if (preset.path == undefined)
+                console.dir(parentKeyNode);
+            preset.displayName = path.win32.parse(preset.path).name;
+            var registryPath = path.posix.join(preset.folderDisplayPath, preset.displayName);
+            cache.registry[registryPath] = preset;
+            cache.list.push(preset);
+        }
+    };
+    return AMEPresetsCacheReader;
+}());
+exports.AMEPresetsCacheReader = AMEPresetsCacheReader;
 var AMEPresetsTreeReader = (function () {
     function AMEPresetsTreeReader() {
     }

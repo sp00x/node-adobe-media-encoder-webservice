@@ -1,9 +1,13 @@
 'use strict';
 require('source-map-support').install();
 
+import fs = require('fs');
+
 import {
     AdobeMediaEncoder,
-    AMEPresetsTreeReader,
+    AMEPresetsReader,
+    IAMEPresetsCache,    
+    IAMEPresetsTree,    
     IAMEPresetsTreeItem,
     AMEPresetsTreeItemType,
     IAMEPreset,
@@ -11,7 +15,7 @@ import {
     IAMEWebserviceClientConfig,
     AMEJobStatus,
     AMESubmitResult,
-    AMEServerStatus,
+    AMEServerStatus,    
     IAMEJobStatusResponse,
     IAMESubmitJobResponse,
     IAMEServerStatusResponse,
@@ -24,12 +28,26 @@ var ame = new AMEWebserviceClient(<IAMEWebserviceClientConfig>{
 
 var cmd = process.argv[2];
 
-if (cmd == 'list_presets')
+if (cmd == "list_cache")
+{
+    var cachePath = "C:\\Users\\rune\\Documents\\Adobe\\Adobe Media Encoder\\9.0\\PresetCache.xml";
+    AMEPresetsReader.loadCache(cachePath)
+        .then((cache) => {
+            fs.writeFileSync('presets_cache_dump.json', JSON.stringify(cache));
+            //console.log(JSON.stringify(cache, null, '  '));
+        }, (err) => {
+            console.error("problem:", err);
+        })
+}
+else if (cmd == 'list_presets')
 {
     //var p = new PresetsTreeReader("C:\\Users\\rune\\Documents\\Adobe\\Adobe Media Encoder\\9.0\\Presets\\PresetTree.xml");
-    AMEPresetsTreeReader.load("C:\\Users\\rune\\Documents\\Adobe\\Adobe Media Encoder\\9.0\\Presets\\PresetTree.xml")
+    //var presetsPath = "C:\\Users\\rune\\Documents\\Adobe\\Adobe Media Encoder\\9.0\\Presets\\PresetTree.xml";
+    var presetsPath = "c:\\temp\\PresetTree.xml";
+    AMEPresetsReader.loadTree(presetsPath)
         .then((presets) => {
-            console.log(JSON.stringify(presets, null, '  '));
+            fs.writeFileSync('presets_tree_dump.json', JSON.stringify(presets));
+            //console.log(JSON.stringify(presets, null, '  '));
         }, (err) => {
             console.error("problem:", err);
         });
