@@ -15,7 +15,7 @@ export class AMEPresetsReader
 {
     static normalizePresetName(pn: string): string
     {
-        return (pn || "").toString().toLowerCase().replace(/\s+/, ' ');
+        return (pn || "").toString().toLowerCase().replace(/\s+/, '');
     }
 
     static loadCache(path: string): q.Promise<IAMEPresetsCache>
