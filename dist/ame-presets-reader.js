@@ -11,7 +11,7 @@ var AMEPresetsReader = (function () {
     function AMEPresetsReader() {
     }
     AMEPresetsReader.normalizePresetName = function (pn) {
-        return (pn || "").toString().toLowerCase().replace(/\s+/, '');
+        return (pn || "").toString().toLowerCase().replace(/\s+/g, '');
     };
     AMEPresetsReader.loadCache = function (path) {
         var d = q.defer();
