@@ -53,8 +53,8 @@ var AMEQueuedJob = (function (_super) {
             .onEnter(function () { return _this._submit(); })
             .on('submit').selfTransition()
             .on('failed').transitionTo('end')
-            .on('abort').transitionTo('abort')
             .on('rejected').transitionTo('end')
+            .on('abort').transitionTo('abort')
             .on('accepted').transitionTo('wait')
             .state('wait')
             .onEnter(function () { return _this._waitForJobCompletion(); })
@@ -158,8 +158,9 @@ var AMEQueuedJob = (function (_super) {
         else
             setImmediate(dispatch);
     };
-    AMEQueuedJob.prototype._retrySubmit = function (wasBusy) {
+    AMEQueuedJob.prototype._retrySubmit = function (wasBusy, failAction) {
         var _this = this;
+        if (failAction === void 0) { failAction = 'failed'; }
         this._status = AMEQueuedJobStatus.Pending;
         if (wasBusy || this._submitRetries-- > 0) {
             this._statusDetail = "Retrying submit to AME in " + this._submitRetryDelaySeconds + "s (attempts left: " + this._submitRetries + ")";
@@ -171,7 +172,7 @@ var AMEQueuedJob = (function (_super) {
             this._log.info("Exceeded submit retry limit, failing job..");
             this._statusDetail = "Exceeded submit retry limit, failing job..";
             this._emitProgress(true);
-            this._states.handle('failed');
+            this._states.handle(failAction);
         }
     };
     AMEQueuedJob.prototype._submit = function () {
@@ -186,14 +187,18 @@ var AMEQueuedJob = (function (_super) {
             log.info("AME responded with submit status '" + status.submitResultText + "'");
             switch (status.submitResult) {
                 case ame_webservice_client_1.AMESubmitResult.Accepted:
-                    log.info("AME accepted out job!");
+                    log.info("AME accepted our job!");
                     _this._states.handle('accepted');
                     _this._emitProgress();
                     break;
                 case ame_webservice_client_1.AMESubmitResult.BadSyntax:
-                case ame_webservice_client_1.AMESubmitResult.Rejected:
-                    log.info("AME rejected our job!");
+                    log.info("AME rejected our job claiming 'bad syntax' - can't recover!");
                     _this._states.handle('rejected');
+                    _this._emitProgress();
+                    break;
+                case ame_webservice_client_1.AMESubmitResult.Rejected:
+                    log.info("AME rejected our job - will retry..");
+                    _this._retrySubmit(false, 'rejected');
                     _this._emitProgress();
                     break;
                 case ame_webservice_client_1.AMESubmitResult.Busy:

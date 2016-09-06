@@ -50,7 +50,7 @@ export declare class AMEQueuedJob extends events.EventEmitter {
     private _lastEmitStatus;
     private _emitProgress(forceEmit?);
     private _safeEmit(eventName, eventArgs?, dispatchViaImmediate?);
-    private _retrySubmit(wasBusy);
+    private _retrySubmit(wasBusy, failAction?);
     private _submit();
     private _retryWait(isErrorState?);
     private _waitForJobCompletion();

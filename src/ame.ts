@@ -144,8 +144,8 @@ export class AMEQueuedJob extends events.EventEmitter
                     .onEnter(() => this._submit())
                     .on('submit').selfTransition() // busy/retry
                     .on('failed').transitionTo('end')
-                    .on('abort').transitionTo('abort')
                     .on('rejected').transitionTo('end')
+                    .on('abort').transitionTo('abort')
                     .on('accepted').transitionTo('wait')
 
                 .state('wait')
@@ -230,7 +230,7 @@ export class AMEQueuedJob extends events.EventEmitter
         else setImmediate(dispatch);
     }
 
-    private _retrySubmit(wasBusy: boolean)
+    private _retrySubmit(wasBusy: boolean, failAction: string = 'failed')
     {
         this._status = AMEQueuedJobStatus.Pending;
 
@@ -248,7 +248,7 @@ export class AMEQueuedJob extends events.EventEmitter
             this._statusDetail = "Exceeded submit retry limit, failing job..";
             this._emitProgress(true);
 
-            this._states.handle('failed');
+            this._states.handle(failAction);
         }
     }
 
@@ -272,18 +272,40 @@ export class AMEQueuedJob extends events.EventEmitter
                 {
                     case AMESubmitResult.Accepted:
 
-                        log.info("AME accepted out job!");
+                        log.info("AME accepted our job!");
                         this._states.handle('accepted');
                         this._emitProgress();
                         break;
 
                     case AMESubmitResult.BadSyntax:
-                    case AMESubmitResult.Rejected:
-
-                        log.info("AME rejected our job!");
+                    
+                        log.info("AME rejected our job claiming 'bad syntax' - can't recover!");
                         this._states.handle('rejected');
                         this._emitProgress();
                         break;
+
+                    case AMESubmitResult.Rejected:
+
+                        log.info("AME rejected our job - will retry..");
+                        // We could just do this._stats.handle('rejected') but sometimes AME will
+                        // temporarily just fail jobs, probably because it is low on resources.
+                        //
+                        // Console output will be:
+                        //
+                        // Job request received.
+                        //
+                        // Source path: Z:\temp\render_jobs\57ce729f56222a640a89fca6\e10c9484-def6-47cf-a38d-e5fa5065e63f.mov
+                        // Output path: Z:\temp\render_jobs\57ce729f56222a640a89fca6\ITN_OYML050_030.mxf
+                        // Preset path: C:\Program Files\Adobe\Adobe Media Encoder CC 2015.3\MediaIO\systempresets\58444341_4D584658\XDCAMHD 50 PAL 50i.epr
+                        //
+                        //
+                        // Creating encoder.
+                        //
+                        // Creating Encoder - Timeout while creating encoder group
+                        this._retrySubmit(false, 'rejected');
+                        this._emitProgress();
+                        break;
+
 
                     case AMESubmitResult.Busy:
 

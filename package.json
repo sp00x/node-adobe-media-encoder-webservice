@@ -1,6 +1,6 @@
 {
   "name": "adobe-media-encoder-webservice",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Adobe Media Encoder web service client",
   "private": true,
   "license": "UNLICENSED",
