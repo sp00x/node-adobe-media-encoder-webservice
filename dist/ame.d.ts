@@ -37,12 +37,12 @@ export declare class AMEQueuedJob extends events.EventEmitter {
     private _log;
     private _isSubmitted;
     private _isAborted;
-    job: IAMEJobSubmission;
-    status: AMEQueuedJobStatus;
-    statusText: string;
-    statusDetail: string;
-    lastStatusResponse: IAMEJobStatusResponse;
-    progress: number;
+    readonly job: IAMEJobSubmission;
+    readonly status: AMEQueuedJobStatus;
+    readonly statusText: string;
+    readonly statusDetail: string;
+    readonly lastStatusResponse: IAMEJobStatusResponse;
+    readonly progress: number;
     constructor(job: IAMEJobSubmission, logFactory: ILoggerFactory, ame: AdobeMediaEncoder, id?: string);
     submit(): void;
     abort(): void;
@@ -66,7 +66,7 @@ export declare class AdobeMediaEncoder extends events.EventEmitter {
     private _http;
     private _log;
     private _logFactory;
-    client: AMEWebserviceClient;
+    readonly client: AMEWebserviceClient;
     constructor(options: IAdobeMediaEncoderOptions);
     start(): q.Promise<void>;
     _queueStates: any;

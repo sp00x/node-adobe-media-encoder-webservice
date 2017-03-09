@@ -404,7 +404,7 @@ export class AMEQueuedJob extends events.EventEmitter
 
                     case AMEJobStatus.Failed:
 
-                        this.statusDetail = `AME reports our job as failed`;
+                        this._statusDetail = `AME reports our job as failed`;
                         log.error(`AME reports our job as failed`);
                         //this._status = AMEQueuedJobStatus.Failed; // let 'ended' figure this out
                         this._states.handle('end');

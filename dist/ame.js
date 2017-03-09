@@ -270,7 +270,7 @@ var AMEQueuedJob = (function (_super) {
                     _this._states.handle('end');
                     break;
                 case ame_webservice_client_1.AMEJobStatus.Failed:
-                    _this.statusDetail = "AME reports our job as failed";
+                    _this._statusDetail = "AME reports our job as failed";
                     log.error("AME reports our job as failed");
                     _this._states.handle('end');
                     break;
